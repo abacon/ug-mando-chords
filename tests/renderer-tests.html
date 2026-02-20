@@ -60,17 +60,17 @@
     return { r: d[0], g: d[1], b: d[2], a: d[3] };
   }
 
-  function isWhitish(px) {
-    return px.r > 200 && px.g > 200 && px.b > 200 && px.a > 200;
+  function hasInk(px) {
+    return px.a > 30;
   }
 
   // Sample the dot edge (offset from center) to avoid hitting finger-number text
   function hasDot(ctx, x, y) {
-    return isWhitish(pixelAt(ctx, x + 6, y));
+    return hasInk(pixelAt(ctx, x + 6, y));
   }
 
   // Layout constants (mirrored from renderer for probe locations)
-  var GRID_L = 31, GRID_R = 127, GRID_T = 32, FRET_H = 28, MARKER_Y = 16;
+  var GRID_L = 41, GRID_R = 101, GRID_T = 25, FRET_H = 24, MARKER_Y = 6;
   var STR_GAP = (GRID_R - GRID_L) / 3;
   function strX(i) { return GRID_L + i * STR_GAP; }
   function dotCY(f) { return GRID_T + f * FRET_H - FRET_H / 2; }
@@ -106,7 +106,7 @@
           ["Open marker string 1", regionHasPixels(ctx, strX(1) - 7, MARKER_Y - 7, 14, 14)],
           ["Open marker string 2", regionHasPixels(ctx, strX(2) - 7, MARKER_Y - 7, 14, 14)],
           ["Open marker string 3", regionHasPixels(ctx, strX(3) - 7, MARKER_Y - 7, 14, 14)],
-          ["No dot at fret 1 center", !isWhitish(pixelAt(ctx, (GRID_L + GRID_R) / 2, dotCY(1)))],
+          ["No dot at fret 1 center", !hasDot(ctx, (GRID_L + GRID_R) / 2, dotCY(1))],
         ];
       },
     },
@@ -158,8 +158,8 @@
       voicing: { frets: [1, 3, 3, 1], fingers: [1, 3, 4, 1], baseFret: 5, barres: [1] },
       assertions: function (canvas, ctx) {
         return [
-          ["No nut (thick bar) at grid top", regionIsEmpty(ctx, GRID_L, GRID_T - 4, GRID_R - GRID_L, 3)],
-          ["Fret label area has text", regionHasPixels(ctx, 0, dotCY(1) - 8, GRID_L - 4, 16)],
+          ["No nut (thick bar) at grid top", regionIsEmpty(ctx, GRID_L, GRID_T - 5, GRID_R - GRID_L, 4)],
+          ["Fret label area has text", regionHasPixels(ctx, GRID_R + 4, dotCY(1) - 10, 30, 20)],
           ["Dot on string 1 at fret 3", hasDot(ctx, strX(1), dotCY(3))],
           ["Dot on string 2 at fret 3", hasDot(ctx, strX(2), dotCY(3))],
         ];
@@ -196,8 +196,8 @@
       voicing: { frets: [1, 1, 3, 1], fingers: [1, 1, 3, 1], baseFret: 3, barres: [1] },
       assertions: function (canvas, ctx) {
         return [
-          ["No nut drawn (baseFret 3)", regionIsEmpty(ctx, GRID_L, GRID_T - 4, GRID_R - GRID_L, 3)],
-          ["Fret label present", regionHasPixels(ctx, 0, dotCY(1) - 8, GRID_L - 4, 16)],
+          ["No nut drawn (baseFret 3)", regionIsEmpty(ctx, GRID_L, GRID_T - 5, GRID_R - GRID_L, 4)],
+          ["Fret label present", regionHasPixels(ctx, GRID_R + 4, dotCY(1) - 10, 30, 20)],
           ["Barre spans strings 0-3 at fret 1", regionHasPixels(ctx, strX(0) - 2, dotCY(1) - 8, 4, 16)],
           ["Individual dot on string 2 at fret 3", hasDot(ctx, strX(2), dotCY(3))],
         ];
