@@ -7,18 +7,18 @@
   var FRETS = 5;
 
   // Grid geometry
-  var GRID_L = 31;
-  var GRID_R = 127;
-  var GRID_T = 32;
-  var FRET_H = 28;
+  var GRID_L = 41;
+  var GRID_R = 101;
+  var GRID_T = 25;
+  var FRET_H = 24;
   var STR_GAP = (GRID_R - GRID_L) / (STRINGS - 1);
 
   // Marker position (open/mute indicators above nut)
-  var MARKER_Y = 16;
+  var MARKER_Y = 6;
 
   // Visual constants
-  var COLOR = "#fff";
-  var NUT_H = 3;
+  var COLOR = "#000";
+  var NUT_H = 5;
   var LINE_W = 1.5;
   var DOT_R = 9;
   var MARKER_R = 5;
@@ -54,10 +54,10 @@
       );
     } else {
       ctx.fillStyle = COLOR;
-      ctx.font = "bold 11px Arial,sans-serif";
-      ctx.textAlign = "right";
+      ctx.font = "19px Arial,sans-serif";
+      ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText(voicing.baseFret + "fr", GRID_L - 6, dotCenterY(1));
+      ctx.fillText(voicing.baseFret, GRID_R + 8, dotCenterY(1));
     }
 
     // Fret lines (horizontal)
@@ -126,7 +126,7 @@
       } else if (fr === 0) {
         // Open string — circle above nut
         ctx.strokeStyle = COLOR;
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 2.0;
         ctx.beginPath();
         ctx.arc(x, MARKER_Y, MARKER_R, 0, Math.PI * 2);
         ctx.stroke();

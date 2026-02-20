@@ -94,7 +94,7 @@
         tab.className = refClasses + " mandolin-tab";
       }
       var refStyle = window.getComputedStyle(referenceTab);
-      tab.style.cursor = refStyle.cursor || "pointer";
+      tab.style.cursor = "pointer";
       tab.style.fontSize = refStyle.fontSize;
       tab.style.fontWeight = refStyle.fontWeight;
       tab.style.fontFamily = refStyle.fontFamily;

@@ -17,30 +17,47 @@
 }
 
 .mandolin-panel {
-  padding: 8px 0;
+  --list-columns: 4;
+  display: grid;
+  grid-gap: var(--ug-spacing-xs) 1px;
+  gap: var(--ug-spacing-xs) 1px;
+  grid-template-columns: repeat(var(--list-columns),minmax(auto,1fr));
+  overflow: hidden;
+  width: calc(var(--ug-text-tab-aside-width) - var(--ug-spacing-xs) - 15px);
 }
 
 .mandolin-chord-section {
   margin-bottom: 16px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .mandolin-chord-name {
   display: block;
   font-weight: 700;
   font-size: 14px;
-  margin-bottom: 8px;
-  color: var(--color-text-primary, #fff);
+  align-self: center;
+/*  color: var(--color-text-primary, #fff);*/
+  font: var(--ug-font-mono-m-semibold);
+  line-height: calc(1em+4px)
 }
 
 .mandolin-diagrams {
   display: flex;
-  flex-wrap: wrap;
   gap: 4px;
+  scroll-snap-type: x mandatory;
+  overflow-y: hidden;
+  width: 71px;
+  flex-flow: row nowrap;
+  scrollbar-width: thin;
+  scroll-snap-stop: always;
 }
 
 .mandolin-canvas {
   width: 71px;
   height: 93px;
+  scroll-snap-align: center;
 }
 
 .mandolin-no-chords {

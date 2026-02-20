@@ -6,7 +6,7 @@
   "content_scripts": [
     {
       "matches": [
-        "*://tabs.ultimate-guitar.com/tab/*/chords*"
+        "*://tabs.ultimate-guitar.com/tab/*"
       ],
       "js": [
         "src/chord-data.js",
