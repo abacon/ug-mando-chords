@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "Mandolin Chords for Ultimate Guitar",
+  "version": "1.0.0",
+  "description": "Adds mandolin chord diagrams (GDAE tuning) to Ultimate Guitar chord pages.",
+  "content_scripts": [
+    {
+      "matches": [
+        "*://tabs.ultimate-guitar.com/tab/*/chords*"
+      ],
+      "js": [
+        "src/chord-data.js",
+        "src/chords/c.js",
+        "src/chords/db.js",
+        "src/chords/d.js",
+        "src/chords/eb.js",
+        "src/chords/e.js",
+        "src/chords/f.js",
+        "src/chords/gb.js",
+        "src/chords/g.js",
+        "src/chords/ab.js",
+        "src/chords/a.js",
+        "src/chords/bb.js",
+        "src/chords/b.js",
+        "src/chord-renderer.js",
+        "src/content.js"
+      ],
+      "css": [
+        "styles/mandolin.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "mandolin-chords@example.com"
+    }
+  }
+}

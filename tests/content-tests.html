@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Content Script DOM Assumption Tests</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #1a1a1a; color: #e0e0e0; font-family: system-ui, sans-serif; padding: 24px; }
+  h1 { font-size: 20px; margin-bottom: 8px; }
+  #summary { margin-bottom: 24px; font-size: 14px; }
+  #summary .pass { color: #4caf50; }
+  #summary .fail { color: #f44336; }
+  .test-grid { display: flex; flex-wrap: wrap; gap: 20px; }
+  .test-card {
+    background: #2a2a2a; border-radius: 8px; padding: 16px; width: 320px;
+    border: 2px solid transparent;
+  }
+  .test-card.pass { border-color: #4caf50; }
+  .test-card.fail { border-color: #f44336; }
+  .test-card h3 { font-size: 14px; margin-bottom: 4px; }
+  .test-card .description { font-size: 12px; color: #999; margin-bottom: 10px; }
+  .assertions { font-size: 12px; }
+  .assertions div { padding: 2px 0; }
+  .assertions .ok::before { content: "\2713 "; color: #4caf50; }
+  .assertions .err::before { content: "\2717 "; color: #f44336; }
+  .assertions .err { color: #f44336; }
+  .category { font-size: 16px; margin: 24px 0 12px; color: #aaa; border-bottom: 1px solid #333; padding-bottom: 4px; }
+  .category:first-of-type { margin-top: 0; }
+  #fixture { position: absolute; left: -9999px; top: -9999px; }
+</style>
+</head>
+<body>
+<h1>Content Script DOM Assumption Tests</h1>
+<div id="summary"></div>
+<div id="fixture"></div>
+<div id="tests"></div>
+
+<script>window.__MANDOLIN_TEST__ = true;</script>
+<script src="../src/chord-data.js"></script>
+<script src="../src/chords/c.js"></script>
+<script src="../src/chords/f.js"></script>
+<script src="../src/chords/g.js"></script>
+<script src="../src/chords/a.js"></script>
+<script src="../src/chord-renderer.js"></script>
+<script src="../src/content.js"></script>
+<script src="ug-dom-signature.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var I = window.__MandolinContentInternals__;
+  var SIG = window.__UG_DOM_SIGNATURE__;
+  var fixture = document.getElementById("fixture");
+
+  // --- fixture builder ---
+
+  function buildUGFixture(opts) {
+    opts = opts || {};
+    var headingTag = opts.headingTag || "h2";
+    var headingText = opts.headingText || "Chords";
+    var tabNames = opts.tabNames || ["Guitar", "Ukulele", "Piano"];
+    var useTablistRole = opts.useTablistRole !== false;
+    var useTabpanelRole = opts.useTabpanelRole !== false;
+    var useTabRole = opts.useTabRole !== false;
+    var chordNames = opts.chordNames || ["C", "F", "G", "Am"];
+    var useSectionSpan = opts.useSectionSpan !== false;
+    var includeUnderline = opts.includeUnderline !== false;
+
+    var container = document.createElement("div");
+
+    var heading = document.createElement(headingTag);
+    heading.textContent = headingText;
+    container.appendChild(heading);
+
+    var tablistWrap = document.createElement("div");
+
+    var tablist = document.createElement("div");
+    if (useTablistRole) tablist.setAttribute("role", "tablist");
+    tabNames.forEach(function (name, i) {
+      var tab = document.createElement("div");
+      if (useTabRole) tab.setAttribute("role", "tab");
+      tab.setAttribute("aria-selected", i === 0 ? "true" : "false");
+      tab.textContent = name;
+      tablist.appendChild(tab);
+    });
+
+    if (includeUnderline) {
+      var underline = document.createElement("div");
+      underline.style.height = "2px";
+      underline.style.background = "#000";
+      tablist.appendChild(underline);
+    }
+
+    tablistWrap.appendChild(tablist);
+
+    var panel = document.createElement("div");
+    if (useTabpanelRole) panel.setAttribute("role", "tabpanel");
+
+    if (useSectionSpan) {
+      chordNames.forEach(function (name) {
+        var section = document.createElement("section");
+        var span = document.createElement("span");
+        span.textContent = name;
+        section.appendChild(span);
+        panel.appendChild(section);
+      });
+    } else {
+      chordNames.forEach(function (name) {
+        var span = document.createElement("span");
+        span.textContent = name;
+        panel.appendChild(span);
+      });
+    }
+
+    tablistWrap.appendChild(panel);
+    container.appendChild(tablistWrap);
+
+    fixture.innerHTML = "";
+    fixture.appendChild(container);
+
+    return {
+      container: container,
+      heading: heading,
+      tablist: tablist,
+      tablistWrap: tablistWrap,
+      panel: panel
+    };
+  }
+
+  function resetFixture() {
+    fixture.innerHTML = "";
+    if (window.__MANDOLIN_TEST_RESET__) window.__MANDOLIN_TEST_RESET__();
+    var existing = document.querySelector(".mandolin-tab");
+    if (existing) existing.remove();
+    var existingPanel = document.querySelector(".mandolin-panel");
+    if (existingPanel) existingPanel.remove();
+  }
+
+  // --- test runner ---
+
+  var tests = [];
+  var currentCategory = "";
+
+  function category(name) {
+    currentCategory = name;
+  }
+
+  function test(name, description, fn) {
+    tests.push({ name: name, description: description, fn: fn, category: currentCategory });
+  }
+
+  // --- A: Critical selectors ---
+
+  category("A: Critical selectors");
+
+  test("A1: findChordsHeading", "Finds <h2> with exact text \"Chords\"", function () {
+    buildUGFixture();
+    var h = I.findChordsHeading();
+    return [
+      ["Found heading", h !== null],
+      ["Tag is H2", h && h.tagName === "H2"],
+      ["Text is 'Chords'", h && h.textContent.trim() === "Chords"],
+    ];
+  });
+
+  test("A1-neg: wrong heading text", "Returns null for different heading text", function () {
+    buildUGFixture({ headingText: "Chord Diagrams" });
+    var h = I.findChordsHeading();
+    return [
+      ["Returns null", h === null],
+    ];
+  });
+
+  test("A2: findTablist", "Finds [role=\"tablist\"] near the heading", function () {
+    buildUGFixture();
+    var h = I.findChordsHeading();
+    var tl = I.findTablist(h);
+    return [
+      ["Found tablist", tl !== null],
+      ["Has role=tablist", tl && tl.getAttribute("role") === "tablist"],
+    ];
+  });
+
+  test("A2-neg: missing tablist role", "Returns null when role attribute missing", function () {
+    buildUGFixture({ useTablistRole: false });
+    var h = I.findChordsHeading();
+    var tl = I.findTablist(h);
+    return [
+      ["Returns null", tl === null],
+    ];
+  });
+
+  test("A3: findTabpanel", "Finds [role=\"tabpanel\"] in tablist's parent", function () {
+    buildUGFixture();
+    var h = I.findChordsHeading();
+    var tl = I.findTablist(h);
+    var tp = I.findTabpanel(tl);
+    return [
+      ["Found tabpanel", tp !== null],
+      ["Has role=tabpanel", tp && tp.getAttribute("role") === "tabpanel"],
+    ];
+  });
+
+  test("A3-neg: missing tabpanel role", "Returns null when role attribute missing", function () {
+    buildUGFixture({ useTabpanelRole: false });
+    var h = I.findChordsHeading();
+    var tl = I.findTablist(h);
+    var tp = I.findTabpanel(tl);
+    return [
+      ["Returns null", tp === null],
+    ];
+  });
+
+  test("A4: extractChordNames primary", "Reads chord names from section > span", function () {
+    buildUGFixture();
+    var h = I.findChordsHeading();
+    var tl = I.findTablist(h);
+    var tp = I.findTabpanel(tl);
+    var names = I.extractChordNames(tp);
+    return [
+      ["Found 4 chord names", names.length === 4],
+      ["First chord is C", names[0] === "C"],
+      ["Second chord is F", names[1] === "F"],
+      ["Third chord is G", names[2] === "G"],
+      ["Fourth chord is Am", names[3] === "Am"],
+    ];
+  });
+
+  test("A4: extractChordNames fallback", "Falls back to regex-matching loose <span> elements", function () {
+    buildUGFixture({ useSectionSpan: false });
+    var h = I.findChordsHeading();
+    var tl = I.findTablist(h);
+    var tp = I.findTabpanel(tl);
+    var names = I.extractChordNames(tp);
+    return [
+      ["Found chord names via fallback", names.length === 4],
+      ["Contains C", names.indexOf("C") !== -1],
+      ["Contains Am", names.indexOf("Am") !== -1],
+    ];
+  });
+
+  test("A5: tab role attribute", "Tabs within tablist have role=\"tab\"", function () {
+    buildUGFixture();
+    var h = I.findChordsHeading();
+    var tl = I.findTablist(h);
+    var tabs = tl.querySelectorAll('[role="tab"]');
+    return [
+      ["Found 3 tabs with role=tab", tabs.length === 3],
+      ["First tab text is Guitar", tabs[0].textContent === "Guitar"],
+    ];
+  });
+
+  test("A6: panel parent container", "tabpanel.parentElement contains both tablist and panel", function () {
+    buildUGFixture();
+    var h = I.findChordsHeading();
+    var tl = I.findTablist(h);
+    var tp = I.findTabpanel(tl);
+    var parent = tp.parentElement;
+    return [
+      ["Parent exists", parent !== null],
+      ["Parent contains tablist", parent && parent.contains(tl)],
+      ["Parent contains tabpanel", parent && parent.contains(tp)],
+    ];
+  });
+
+  // --- B: Secondary assumptions ---
+
+  category("B: Secondary assumptions");
+
+  test("B7: findUnderline", "Identifies non-tab child with height <= 4px", function () {
+    buildUGFixture();
+    var h = I.findChordsHeading();
+    var tl = I.findTablist(h);
+    var ul = I.findUnderline(tl);
+    return [
+      ["Found underline element", ul !== null],
+      ["Not a tab", ul && ul.getAttribute("role") !== "tab"],
+      ["Has small height", ul && (ul.style.height === "2px" || ul.style.height === "3px")],
+    ];
+  });
+
+  test("B7-absent: no underline", "Returns null gracefully when no underline exists", function () {
+    buildUGFixture({ includeUnderline: false });
+    var h = I.findChordsHeading();
+    var tl = I.findTablist(h);
+    var ul = I.findUnderline(tl);
+    return [
+      ["Returns null", ul === null],
+    ];
+  });
+
+  test("B8: tab click events", "Click events propagate to our listeners", function () {
+    buildUGFixture();
+    var h = I.findChordsHeading();
+    var tl = I.findTablist(h);
+    var tabs = tl.querySelectorAll('[role="tab"]');
+    var clicked = false;
+    tabs[0].addEventListener("click", function () { clicked = true; });
+    tabs[0].click();
+    return [
+      ["Click handler fired", clicked],
+    ];
+  });
+
+  test("B9: MutationObserver", "Detects childList mutations on tablist parent", function () {
+    buildUGFixture();
+    var h = I.findChordsHeading();
+    var tl = I.findTablist(h);
+    var container = tl.parentElement;
+
+    return new Promise(function (resolve) {
+      var detected = false;
+      var observer = new MutationObserver(function () {
+        detected = true;
+      });
+      observer.observe(container, { childList: true, subtree: true });
+
+      var el = document.createElement("div");
+      el.textContent = "mutation-test";
+      container.appendChild(el);
+
+      setTimeout(function () {
+        observer.disconnect();
+        container.removeChild(el);
+        resolve([
+          ["Mutation detected", detected],
+        ]);
+      }, 50);
+    });
+  });
+
+  test("B11: cleanup selectors", ".mandolin-tab and .mandolin-panel find injected elements", function () {
+    buildUGFixture();
+    resetFixture();
+    buildUGFixture();
+    I.init();
+
+    var tab = document.querySelector(".mandolin-tab");
+    var panel = document.querySelector(".mandolin-panel");
+    return [
+      ["Found .mandolin-tab", tab !== null],
+      ["Found .mandolin-panel", panel !== null],
+    ];
+  });
+
+  // --- C: Integration ---
+
+  category("C: Integration");
+
+  test("C1: full init", "init() creates mandolin tab + panel against standard fixture", function () {
+    resetFixture();
+    buildUGFixture();
+    I.init();
+
+    var tab = document.querySelector(".mandolin-tab");
+    var panel = document.querySelector(".mandolin-panel");
+    return [
+      ["Mandolin tab created", tab !== null],
+      ["Mandolin tab has role=tab", tab && tab.getAttribute("role") === "tab"],
+      ["Mandolin tab text is Mandolin", tab && tab.textContent === "Mandolin"],
+      ["Mandolin panel created", panel !== null],
+      ["Mandolin panel has role=tabpanel", panel && panel.getAttribute("role") === "tabpanel"],
+      ["Panel initially hidden", panel && panel.style.display === "none"],
+    ];
+  });
+
+  test("C2: mandolin tab click", "Shows mandolin panel, hides others, updates aria-selected", function () {
+    resetFixture();
+    buildUGFixture();
+    I.init();
+
+    var tab = document.querySelector(".mandolin-tab");
+    var panel = document.querySelector(".mandolin-panel");
+    var originalPanel = fixture.querySelector('[role="tabpanel"]:not(.mandolin-panel)');
+
+    tab.click();
+
+    return [
+      ["Mandolin panel visible", panel && panel.style.display !== "none"],
+      ["Mandolin tab selected", tab && tab.getAttribute("aria-selected") === "true"],
+      ["Original panel hidden", originalPanel && originalPanel.style.display === "none"],
+    ];
+  });
+
+  test("C3: original tab click", "Hides mandolin panel, deselects mandolin tab", function () {
+    resetFixture();
+    buildUGFixture();
+    I.init();
+
+    var mandolinTab = document.querySelector(".mandolin-tab");
+    var mandolinPanel = document.querySelector(".mandolin-panel");
+    var h = I.findChordsHeading();
+    var tl = I.findTablist(h);
+    var originalTab = tl.querySelector('[role="tab"]:not(.mandolin-tab)');
+
+    mandolinTab.click();
+    originalTab.click();
+
+    return [
+      ["Mandolin panel hidden", mandolinPanel && mandolinPanel.style.display === "none"],
+      ["Mandolin tab deselected", mandolinTab && mandolinTab.getAttribute("aria-selected") === "false"],
+    ];
+  });
+
+  test("C4: idempotent init", "Calling init() twice doesn't create duplicate tabs", function () {
+    resetFixture();
+    buildUGFixture();
+    I.init();
+    I.init();
+
+    var tabs = document.querySelectorAll(".mandolin-tab");
+    var panels = document.querySelectorAll(".mandolin-panel");
+    return [
+      ["Only one mandolin tab", tabs.length === 1],
+      ["Only one mandolin panel", panels.length === 1],
+    ];
+  });
+
+  // --- D: Canary (fixture vs real UG) ---
+
+  category("D: Canary (fixture vs. real UG signature)");
+
+  test("D1: heading tag & text", "Fixture matches signature's heading facts", function () {
+    var parts = buildUGFixture();
+    return [
+      ["Heading tag matches", parts.heading.tagName === SIG.chordsHeadingTag],
+      ["Heading text matches", parts.heading.textContent.trim() === SIG.chordsHeadingText],
+    ];
+  });
+
+  test("D2: tab names", "Fixture tab count and names match signature", function () {
+    var parts = buildUGFixture();
+    var tabs = parts.tablist.querySelectorAll('[role="tab"]');
+    var names = [];
+    tabs.forEach(function (t) { names.push(t.textContent); });
+    return [
+      ["Tab count matches", names.length === SIG.tabNames.length],
+      ["Tab names match", JSON.stringify(names) === JSON.stringify(SIG.tabNames)],
+    ];
+  });
+
+  test("D3: chord extraction", "Extraction from signature's sample chords succeeds", function () {
+    buildUGFixture({ chordNames: SIG.sampleChordNames });
+    var h = I.findChordsHeading();
+    var tl = I.findTablist(h);
+    var tp = I.findTabpanel(tl);
+    var names = I.extractChordNames(tp);
+    return [
+      ["Extracted correct count", names.length === SIG.sampleChordNames.length],
+      ["Names match signature", JSON.stringify(names) === JSON.stringify(SIG.sampleChordNames)],
+    ];
+  });
+
+  test("D4: ARIA roles", "tablist/tabpanel/tab roles present per signature", function () {
+    var parts = buildUGFixture();
+    var hasTablist = parts.tablist.getAttribute("role") === "tablist";
+    var hasTabpanel = parts.panel.getAttribute("role") === "tabpanel";
+    var tabs = parts.tablist.querySelectorAll('[role="tab"]');
+    return [
+      ["tablist role matches signature", hasTablist === SIG.tablistRolePresent],
+      ["tabpanel role matches signature", hasTabpanel === SIG.tabpanelRolePresent],
+      ["tabs have role=tab per signature", (tabs.length > 0) === SIG.tabsHaveRoleTab],
+    ];
+  });
+
+  // --- run tests ---
+
+  var container = document.getElementById("tests");
+  var totalPass = 0;
+  var totalFail = 0;
+  var pending = tests.length;
+
+  function renderCard(t, results) {
+    if (t._lastCategory !== t.category) {
+      var catHeader = document.createElement("div");
+      catHeader.className = "category";
+      catHeader.textContent = t.category;
+      container.appendChild(catHeader);
+      t._lastCategory = t.category;
+    }
+
+    var card = document.createElement("div");
+    card.className = "test-card";
+
+    var h3 = document.createElement("h3");
+    h3.textContent = t.name;
+    card.appendChild(h3);
+
+    var desc = document.createElement("div");
+    desc.className = "description";
+    desc.textContent = t.description;
+    card.appendChild(desc);
+
+    var assertDiv = document.createElement("div");
+    assertDiv.className = "assertions";
+    var cardPass = true;
+
+    results.forEach(function (r) {
+      var line = document.createElement("div");
+      line.className = r[1] ? "ok" : "err";
+      line.textContent = r[0];
+      assertDiv.appendChild(line);
+      if (r[1]) {
+        totalPass++;
+      } else {
+        totalFail++;
+        cardPass = false;
+      }
+    });
+
+    card.appendChild(assertDiv);
+    card.className += cardPass ? " pass" : " fail";
+    container.appendChild(card);
+  }
+
+  function updateSummary() {
+    var summary = document.getElementById("summary");
+    summary.innerHTML =
+      '<span class="pass">' + totalPass + " passed</span>, " +
+      '<span class="fail">' + totalFail + " failed</span> " +
+      "(" + (totalPass + totalFail) + " assertions across " + tests.length + " test cases)";
+  }
+
+  var lastCategory = "";
+
+  function runAll(index) {
+    if (index >= tests.length) {
+      updateSummary();
+      return;
+    }
+
+    var t = tests[index];
+    t._lastCategory = lastCategory;
+
+    resetFixture();
+    var result;
+    try {
+      result = t.fn();
+    } catch (e) {
+      result = [["Threw: " + e.message, false]];
+    }
+
+    if (result && typeof result.then === "function") {
+      result.then(function (results) {
+        renderCard(t, results);
+        lastCategory = t.category;
+        runAll(index + 1);
+      }).catch(function (e) {
+        renderCard(t, [["Promise rejected: " + e.message, false]]);
+        lastCategory = t.category;
+        runAll(index + 1);
+      });
+    } else {
+      renderCard(t, result);
+      lastCategory = t.category;
+      runAll(index + 1);
+    }
+  }
+
+  runAll(0);
+})();
+</script>
+</body>
+</html>

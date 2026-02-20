@@ -1,0 +1,50 @@
+.mandolin-tab {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.mandolin-tab[aria-selected="true"] {
+  opacity: 1;
+}
+
+.mandolin-tab[aria-selected="false"] {
+  opacity: 0.6;
+}
+
+.mandolin-tab:hover {
+  opacity: 1;
+}
+
+.mandolin-panel {
+  padding: 8px 0;
+}
+
+.mandolin-chord-section {
+  margin-bottom: 16px;
+}
+
+.mandolin-chord-name {
+  display: block;
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: var(--color-text-primary, #fff);
+}
+
+.mandolin-diagrams {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.mandolin-canvas {
+  width: 71px;
+  height: 93px;
+}
+
+.mandolin-no-chords {
+  color: var(--color-text-secondary, #999);
+  font-size: 13px;
+  padding: 12px 0;
+}

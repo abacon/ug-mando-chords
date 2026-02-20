@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Mandolin Chord Renderer Tests</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #1a1a1a; color: #e0e0e0; font-family: system-ui, sans-serif; padding: 24px; }
+  h1 { font-size: 20px; margin-bottom: 8px; }
+  #summary { margin-bottom: 24px; font-size: 14px; }
+  #summary .pass { color: #4caf50; }
+  #summary .fail { color: #f44336; }
+  .test-grid { display: flex; flex-wrap: wrap; gap: 20px; }
+  .test-card {
+    background: #2a2a2a; border-radius: 8px; padding: 16px; width: 280px;
+    border: 2px solid transparent;
+  }
+  .test-card.pass { border-color: #4caf50; }
+  .test-card.fail { border-color: #f44336; }
+  .test-card h3 { font-size: 14px; margin-bottom: 4px; }
+  .test-card .description { font-size: 12px; color: #999; margin-bottom: 10px; }
+  .test-card canvas { display: block; margin: 0 auto 10px; background: #111; border-radius: 4px; }
+  .test-card .voicing-data {
+    font-family: monospace; font-size: 11px; background: #111; padding: 8px;
+    border-radius: 4px; white-space: pre-wrap; word-break: break-all; margin-bottom: 8px;
+  }
+  .assertions { font-size: 12px; }
+  .assertions div { padding: 2px 0; }
+  .assertions .ok::before { content: "\2713 "; color: #4caf50; }
+  .assertions .err::before { content: "\2717 "; color: #f44336; }
+  .assertions .err { color: #f44336; }
+</style>
+</head>
+<body>
+<h1>Mandolin Chord Renderer Tests</h1>
+<div id="summary"></div>
+<div id="tests" class="test-grid"></div>
+
+<script src="../src/chord-renderer.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // --- helpers ---
+
+  function regionHasPixels(ctx, x, y, w, h) {
+    var data = ctx.getImageData(x, y, w, h).data;
+    for (var i = 3; i < data.length; i += 4) {
+      if (data[i] > 0) return true;
+    }
+    return false;
+  }
+
+  function regionIsEmpty(ctx, x, y, w, h) {
+    return !regionHasPixels(ctx, x, y, w, h);
+  }
+
+  function pixelAt(ctx, x, y) {
+    var d = ctx.getImageData(Math.round(x), Math.round(y), 1, 1).data;
+    return { r: d[0], g: d[1], b: d[2], a: d[3] };
+  }
+
+  function isWhitish(px) {
+    return px.r > 200 && px.g > 200 && px.b > 200 && px.a > 200;
+  }
+
+  // Sample the dot edge (offset from center) to avoid hitting finger-number text
+  function hasDot(ctx, x, y) {
+    return isWhitish(pixelAt(ctx, x + 6, y));
+  }
+
+  // Layout constants (mirrored from renderer for probe locations)
+  var GRID_L = 31, GRID_R = 127, GRID_T = 32, FRET_H = 28, MARKER_Y = 16;
+  var STR_GAP = (GRID_R - GRID_L) / 3;
+  function strX(i) { return GRID_L + i * STR_GAP; }
+  function dotCY(f) { return GRID_T + f * FRET_H - FRET_H / 2; }
+
+  // --- test cases ---
+
+  var tests = [
+    {
+      name: "Open chord (C)",
+      description: "Two open strings, two fretted, nut shown",
+      voicing: { frets: [0, 2, 3, 0], fingers: [0, 1, 2, 0], baseFret: 1, barres: [] },
+      assertions: function (canvas, ctx, v) {
+        return [
+          ["Canvas width is 142", canvas.width === 142],
+          ["Canvas height is 186", canvas.height === 186],
+          ["Nut area has pixels", regionHasPixels(ctx, GRID_L - 2, GRID_T - 4, GRID_R - GRID_L + 4, 5)],
+          ["Open marker on string 0", regionHasPixels(ctx, strX(0) - 7, MARKER_Y - 7, 14, 14)],
+          ["Open marker on string 3", regionHasPixels(ctx, strX(3) - 7, MARKER_Y - 7, 14, 14)],
+          ["Dot on string 1 at fret 2", hasDot(ctx, strX(1), dotCY(2))],
+          ["Dot on string 2 at fret 3", hasDot(ctx, strX(2), dotCY(3))],
+          ["No dot at fret 1 on string 1", !hasDot(ctx, strX(1), dotCY(1))],
+        ];
+      },
+    },
+    {
+      name: "All open strings",
+      description: "Every string open, nut visible, no dots on grid",
+      voicing: { frets: [0, 0, 0, 0], fingers: [0, 0, 0, 0], baseFret: 1, barres: [] },
+      assertions: function (canvas, ctx) {
+        return [
+          ["Nut drawn", regionHasPixels(ctx, GRID_L - 2, GRID_T - 4, GRID_R - GRID_L + 4, 5)],
+          ["Open marker string 0", regionHasPixels(ctx, strX(0) - 7, MARKER_Y - 7, 14, 14)],
+          ["Open marker string 1", regionHasPixels(ctx, strX(1) - 7, MARKER_Y - 7, 14, 14)],
+          ["Open marker string 2", regionHasPixels(ctx, strX(2) - 7, MARKER_Y - 7, 14, 14)],
+          ["Open marker string 3", regionHasPixels(ctx, strX(3) - 7, MARKER_Y - 7, 14, 14)],
+          ["No dot at fret 1 center", !isWhitish(pixelAt(ctx, (GRID_L + GRID_R) / 2, dotCY(1)))],
+        ];
+      },
+    },
+    {
+      name: "All muted strings",
+      description: "Every string muted with X markers, nut shown",
+      voicing: { frets: [-1, -1, -1, -1], fingers: [0, 0, 0, 0], baseFret: 1, barres: [] },
+      assertions: function (canvas, ctx) {
+        return [
+          ["Mute marker string 0", regionHasPixels(ctx, strX(0) - 6, MARKER_Y - 6, 12, 12)],
+          ["Mute marker string 1", regionHasPixels(ctx, strX(1) - 6, MARKER_Y - 6, 12, 12)],
+          ["Mute marker string 2", regionHasPixels(ctx, strX(2) - 6, MARKER_Y - 6, 12, 12)],
+          ["Mute marker string 3", regionHasPixels(ctx, strX(3) - 6, MARKER_Y - 6, 12, 12)],
+        ];
+      },
+    },
+    {
+      name: "Barre chord",
+      description: "Barre at fret 1 across strings 0-1, individual dots at frets 2 and 3",
+      voicing: { frets: [1, 1, 2, 3], fingers: [1, 1, 2, 3], baseFret: 1, barres: [1] },
+      assertions: function (canvas, ctx) {
+        var barreY = dotCY(1);
+        return [
+          ["Barre pixels at string 0, fret 1", regionHasPixels(ctx, strX(0) - 2, barreY - 8, 4, 16)],
+          ["Barre pixels at string 1, fret 1", regionHasPixels(ctx, strX(1) - 2, barreY - 8, 4, 16)],
+          ["Barre spans between strings 0-1", regionHasPixels(ctx, strX(0) + 10, barreY - 4, 5, 8)],
+          ["Dot on string 2 at fret 2", hasDot(ctx, strX(2), dotCY(2))],
+          ["Dot on string 3 at fret 3", hasDot(ctx, strX(3), dotCY(3))],
+          ["No open/mute markers", regionIsEmpty(ctx, 0, 0, 142, GRID_T - 5)],
+        ];
+      },
+    },
+    {
+      name: "Full barre (4 strings)",
+      description: "Barre spanning all 4 strings at fret 2",
+      voicing: { frets: [2, 2, 2, 2], fingers: [1, 1, 1, 1], baseFret: 1, barres: [2] },
+      assertions: function (canvas, ctx) {
+        var barreY = dotCY(2);
+        return [
+          ["Barre at string 0", regionHasPixels(ctx, strX(0) - 2, barreY - 8, 4, 16)],
+          ["Barre at string 3", regionHasPixels(ctx, strX(3) - 2, barreY - 8, 4, 16)],
+          ["Barre mid-span", regionHasPixels(ctx, (strX(1) + strX(2)) / 2 - 2, barreY - 4, 4, 8)],
+        ];
+      },
+    },
+    {
+      name: "High position (baseFret > 1)",
+      description: "baseFret 5 — no nut drawn, fret label shown instead",
+      voicing: { frets: [1, 3, 3, 1], fingers: [1, 3, 4, 1], baseFret: 5, barres: [1] },
+      assertions: function (canvas, ctx) {
+        return [
+          ["No nut (thick bar) at grid top", regionIsEmpty(ctx, GRID_L, GRID_T - 4, GRID_R - GRID_L, 3)],
+          ["Fret label area has text", regionHasPixels(ctx, 0, dotCY(1) - 8, GRID_L - 4, 16)],
+          ["Dot on string 1 at fret 3", hasDot(ctx, strX(1), dotCY(3))],
+          ["Dot on string 2 at fret 3", hasDot(ctx, strX(2), dotCY(3))],
+        ];
+      },
+    },
+    {
+      name: "Mixed open and muted",
+      description: "Strings with a mix of open, muted, and fretted",
+      voicing: { frets: [-1, 0, 2, -1], fingers: [0, 0, 1, 0], baseFret: 1, barres: [] },
+      assertions: function (canvas, ctx) {
+        return [
+          ["Mute marker on string 0", regionHasPixels(ctx, strX(0) - 6, MARKER_Y - 6, 12, 12)],
+          ["Open marker on string 1", regionHasPixels(ctx, strX(1) - 7, MARKER_Y - 7, 14, 14)],
+          ["Dot on string 2 at fret 2", hasDot(ctx, strX(2), dotCY(2))],
+          ["Mute marker on string 3", regionHasPixels(ctx, strX(3) - 6, MARKER_Y - 6, 12, 12)],
+        ];
+      },
+    },
+    {
+      name: "No fingers array",
+      description: "Voicing without finger data — should still render dots",
+      voicing: { frets: [0, 2, 3, 0], baseFret: 1, barres: [] },
+      assertions: function (canvas, ctx) {
+        return [
+          ["Renders without error", canvas.width === 142],
+          ["Dot on string 1", hasDot(ctx, strX(1), dotCY(2))],
+          ["Dot on string 2", hasDot(ctx, strX(2), dotCY(3))],
+        ];
+      },
+    },
+    {
+      name: "Barre with dots above",
+      description: "Barre at fret 1, string 2 fretted higher — dot should render individually",
+      voicing: { frets: [1, 1, 3, 1], fingers: [1, 1, 3, 1], baseFret: 3, barres: [1] },
+      assertions: function (canvas, ctx) {
+        return [
+          ["No nut drawn (baseFret 3)", regionIsEmpty(ctx, GRID_L, GRID_T - 4, GRID_R - GRID_L, 3)],
+          ["Fret label present", regionHasPixels(ctx, 0, dotCY(1) - 8, GRID_L - 4, 16)],
+          ["Barre spans strings 0-3 at fret 1", regionHasPixels(ctx, strX(0) - 2, dotCY(1) - 8, 4, 16)],
+          ["Individual dot on string 2 at fret 3", hasDot(ctx, strX(2), dotCY(3))],
+        ];
+      },
+    },
+    {
+      name: "Grid structure",
+      description: "Fret and string lines are drawn in the expected positions",
+      voicing: { frets: [0, 0, 0, 0], fingers: [0, 0, 0, 0], baseFret: 1, barres: [] },
+      assertions: function (canvas, ctx) {
+        return [
+          ["Fret line 0 (top)", regionHasPixels(ctx, GRID_L, GRID_T - 1, GRID_R - GRID_L, 2)],
+          ["Fret line 5 (bottom)", regionHasPixels(ctx, GRID_L, GRID_T + 5 * FRET_H - 1, GRID_R - GRID_L, 2)],
+          ["String 0 (leftmost)", regionHasPixels(ctx, strX(0) - 1, GRID_T + 5, 2, 10)],
+          ["String 3 (rightmost)", regionHasPixels(ctx, strX(3) - 1, GRID_T + 5, 2, 10)],
+          ["Empty outside grid (far right)", regionIsEmpty(ctx, GRID_R + 5, GRID_T, 10, FRET_H * 5)],
+        ];
+      },
+    },
+  ];
+
+  // --- run ---
+
+  var container = document.getElementById("tests");
+  var totalPass = 0;
+  var totalFail = 0;
+
+  tests.forEach(function (t) {
+    var card = document.createElement("div");
+    card.className = "test-card";
+
+    var h3 = document.createElement("h3");
+    h3.textContent = t.name;
+    card.appendChild(h3);
+
+    var desc = document.createElement("div");
+    desc.className = "description";
+    desc.textContent = t.description;
+    card.appendChild(desc);
+
+    var canvas = document.createElement("canvas");
+    card.appendChild(canvas);
+
+    window.MandolinRenderer.renderChord(canvas, t.voicing);
+    var ctx = canvas.getContext("2d");
+
+    var data = document.createElement("div");
+    data.className = "voicing-data";
+    data.textContent = JSON.stringify(t.voicing, null, 2);
+    card.appendChild(data);
+
+    var results = t.assertions(canvas, ctx, t.voicing);
+    var assertDiv = document.createElement("div");
+    assertDiv.className = "assertions";
+    var cardPass = true;
+
+    results.forEach(function (r) {
+      var line = document.createElement("div");
+      line.className = r[1] ? "ok" : "err";
+      line.textContent = r[0];
+      assertDiv.appendChild(line);
+      if (r[1]) {
+        totalPass++;
+      } else {
+        totalFail++;
+        cardPass = false;
+      }
+    });
+
+    card.appendChild(assertDiv);
+    card.className += cardPass ? " pass" : " fail";
+    container.appendChild(card);
+  });
+
+  var summary = document.getElementById("summary");
+  summary.innerHTML =
+    '<span class="pass">' + totalPass + " passed</span>, " +
+    '<span class="fail">' + totalFail + " failed</span> " +
+    "(" + (totalPass + totalFail) + " assertions across " + tests.length + " test cases)";
+})();
+</script>
+</body>
+</html>
