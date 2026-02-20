@@ -4,7 +4,7 @@ Browser extension that adds mandolin chord diagrams (GDAE tuning) to Ultimate Gu
 
 ## Install
 
-Load as an unpacked extension in Chrome (`chrome://extensions`) or Firefox.
+Load as an unpacked extension in Chrome (`chrome://extensions`) or Firefox (`about:addons`). Currently only tested in firefox.
 
 ## Tests
 
