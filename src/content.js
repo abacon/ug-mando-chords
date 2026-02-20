@@ -4,6 +4,17 @@
   var TAB_KEY = "mandolin";
   var DIAGRAMS_PER_CHORD = 3;
   var initialized = false;
+  var PREFIX = "[mandolin-chords]";
+
+  function log() {
+    var args = [PREFIX].concat(Array.prototype.slice.call(arguments));
+    console.log.apply(console, args);
+  }
+
+  function warn() {
+    var args = [PREFIX].concat(Array.prototype.slice.call(arguments));
+    console.warn.apply(console, args);
+  }
 
   function findChordsHeading() {
     var headings = document.querySelectorAll("h2");
@@ -22,6 +33,14 @@
       sibling = sibling.nextElementSibling;
     }
     var parent = chordsHeading.parentElement;
+    while (parent) {
+         var possibleTablist = parent.querySelector('[role="tablist"]');
+         if (possibleTablist) {
+             return possibleTablist;
+         } else {
+             parent = parent.parentElement;
+         }
+    }
     if (parent) return parent.querySelector('[role="tablist"]');
     return null;
   }
@@ -58,6 +77,7 @@
         if (text && text.length <= 10 && /^[A-G]/.test(text)) names.push(text);
       });
     }
+    log(names);
     return names;
   }
 
@@ -90,6 +110,7 @@
 
     if (referenceTab) {
       var refClasses = referenceTab.className;
+      log(referenceTab);
       if (refClasses) {
         tab.className = refClasses + " mandolin-tab";
       }
@@ -181,21 +202,47 @@
 
   function init() {
     if (initialized) return;
-    if (!window.MandolinChords || !window.MandolinRenderer) return;
+    if (!window.MandolinChords || !window.MandolinRenderer) {
+      warn("chord data or renderer not loaded yet");
+      return;
+    }
 
     var chordsHeading = findChordsHeading();
-    if (!chordsHeading) return;
+    if (!chordsHeading) {
+      log("waiting for Chords heading");
+      return;
+    }
 
     var tablist = findTablist(chordsHeading);
-    if (!tablist) return;
+    if (!tablist) {
+      warn("tablist not found near Chords heading", chordsHeading);
+      return;
+    }
 
     var existingPanel = findTabpanel(tablist);
-    if (!existingPanel) return;
+    if (!existingPanel) {
+      warn("tabpanel not found near tablist", tablist);
+      return;
+    }
 
-    if (tablist.querySelector('[data-key="' + TAB_KEY + '"]')) return;
+    if (tablist.querySelector('[data-key="' + TAB_KEY + '"]')) {
+      log("tab already injected, skipping");
+      return;
+    }
 
     var chordNames = extractChordNames(existingPanel);
-    if (chordNames.length === 0) return;
+    if (chordNames.length === 0) {
+      warn("no chord names found in tabpanel");
+      return;
+    }
+    log("found chords:", chordNames.join(", "));
+
+    var missing = chordNames.filter(function (n) {
+      return !window.MandolinChords[n];
+    });
+    if (missing.length > 0) {
+      warn("no mandolin data for:", missing.join(", "));
+    }
 
     var existingTabs = tablist.querySelectorAll('[role="tab"]');
     var referenceTab = existingTabs.length > 0 ? existingTabs[0] : null;
@@ -205,6 +252,7 @@
 
     var panelContainer = existingPanel.parentElement;
     panelContainer.appendChild(mandolinPanel);
+    log("injected mandolin tab and panel");
 
     mandolinTab.addEventListener("click", function () {
       deselectAllTabs(tablist);
@@ -232,6 +280,7 @@
 
     initialized = true;
     observeReRenders(tablist, panelContainer);
+    log("initialized");
   }
 
   function observeReRenders(tablist, panelContainer) {
@@ -240,6 +289,7 @@
 
     var observer = new MutationObserver(function () {
       if (!tablist.querySelector('[data-key="' + TAB_KEY + '"]')) {
+        log("tab removed by React re-render, re-injecting");
         initialized = false;
         init();
       }
@@ -273,6 +323,7 @@
   }
 
   function onUrlChange() {
+    log("URL changed, resetting");
     initialized = false;
     var existing = document.querySelector(".mandolin-tab");
     if (existing) existing.remove();
